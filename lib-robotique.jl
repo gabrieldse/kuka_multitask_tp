@@ -24,6 +24,9 @@ function CreateRobotKukaLwr()
 end
 
 function MGD(θ,robot)
+    # Notation Tp=Matrix(I,4,4) - creates a Indentity matrix of 4x4. I is the identity in julia
+    
+    # Equations on the Jupter notebook
     N=length(robot.α);
     T=zeros(4,4);
     Tp=Matrix(I,4,4);
@@ -39,6 +42,14 @@ function MGD(θ,robot)
 end
 
 function Jacobian(θ,robot,p0)
+    # It output is a 6xN
+    # p_dot = J(θ_dot) - The jacobian relates the joint velocities with the end-effector velocity
+    # p0 - position of the end-effector
+    # pi = T[1:3,4] = position of the joint i
+    # zi = T[1:3,3] = orientation of the joint i
+    # l - vector that points to the p0 (end effector) from the joint i
+
+    # Equations on the Jupter notebook
     N=length(robot.α);
     T=zeros(4,4); l=zeros(3,N); z=zeros(3,N);
     Tp=Matrix(I,4,4);
@@ -58,9 +69,12 @@ function Jacobian(θ,robot,p0)
     return J
 end
 
-
 function CoM(θ,robot)
+    # T transforms the local coordinates of the i-th link's center of mass into the global coordinate frame.
+    # T * robot.c[:, i]: Transforms the center of mass from the local frame to the global frame.
+    # Gets the current contribution ((robot.m[i]/M).)
     """ test """
+
         N=length(robot.α);
         M=sum(robot.m[1:N]);
         T=zeros(4,4);
@@ -72,35 +86,36 @@ function CoM(θ,robot)
                   cα*sθ  cα*cθ   -sα   -r*sα;
                   sα*sθ  sα*cθ    cα    r*cα;
                   0.0    0.0     0.0    1.0  ];
-            CoM[:]=(robot.m[i]/M).*T*robot.c[:,i]+CoMp;
+            CoM[:]=(robot.m[i]/M).*T*robot.c[:,i]+CoMp; 
             CoMp=CoM;
             Tp=T;
         end
         return CoM
 end
 
-function JacobianCoM(θ,robot,CoM0) #
-N=length(robot.α);
-M=sum(robot.m[1:N]);
-CoM=zeros(4,1);CoMp=zeros(4,1);
-T=zeros(4,4); l=zeros(3,N); z=zeros(3,N);
-Tp=Matrix(I,4,4);
-CoMo=zeros(4,1);
-Jcom=zeros(3,N);
-for i=1:N
-    cθ=cos(θ[i]); sθ=sin(θ[i]); d=robot.d[i]; sα=sin(robot.α[i]); cα=cos(robot.α[i]); r=robot.r[i];
-    T= Tp*[ cθ     -sθ    0.0    d;
-          cα*sθ  cα*cθ   -sα   -r*sα;
-          sα*sθ  sα*cθ    cα    r*cα;
-           0.0    0.0     0.0    1.0 ];
-   CoMo[:]=(robot.m[i]/M).*T*robot.c[:,i]+CoMp;
-   CoMp=CoMo;
-   l[:,i]=CoM0[1:3]-CoMo[1:3];
-   z[:,i]=T[1:3,3];
-   Jcom[1:3,i]=cross(z[:,i],l[:,i]);
-   Tp=T;
-end
-return Jcom
+function JacobianCoM(θ,robot,CoM0)
+    # output is a 3xN matrix with the jacobian of each segment CoM jacobian as vectors. From 1 to N.
+    N=length(robot.α);
+    M=sum(robot.m[1:N]);
+    CoM=zeros(4,1);CoMp=zeros(4,1);
+    T=zeros(4,4); l=zeros(3,N); z=zeros(3,N);
+    Tp=Matrix(I,4,4);
+    CoMo=zeros(4,1);
+    Jcom=zeros(3,N);
+    for i=1:N
+        cθ=cos(θ[i]); sθ=sin(θ[i]); d=robot.d[i]; sα=sin(robot.α[i]); cα=cos(robot.α[i]); r=robot.r[i];
+        T= Tp*[ cθ     -sθ    0.0    d;
+            cα*sθ  cα*cθ   -sα   -r*sα;
+            sα*sθ  sα*cθ    cα    r*cα;
+            0.0    0.0     0.0    1.0 ];
+    CoMo[:]=(robot.m[i]/M).*T*robot.c[:,i]+CoMp;
+    CoMp=CoMo;
+    l[:,i]=CoM0[1:3]-CoMo[1:3];
+    z[:,i]=T[1:3,3];
+    Jcom[1:3,i]=cross(z[:,i],l[:,i]);
+    Tp=T;
+    end
+    return Jcom
 end
 
 
