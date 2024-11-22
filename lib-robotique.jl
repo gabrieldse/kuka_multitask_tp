@@ -73,7 +73,7 @@ function CoM(θ,robot)
     # T transforms the local coordinates of the i-th link's center of mass into the global coordinate frame.
     # T * robot.c[:, i]: Transforms the center of mass from the local frame to the global frame.
     # Gets the current contribution ((robot.m[i]/M).)
-    """ test """
+    """ return 3x1 CoM position on the robot coordinate frame """
 
         N=length(robot.α);
         M=sum(robot.m[1:N]);
