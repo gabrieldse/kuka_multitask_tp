@@ -5,86 +5,118 @@ include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
 
 using Plots
 
-function multi_task(θinit,g1,g2,tol_1,tol_2)
+function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
     
     """
 
     """
 
     # Init variables (J1, J2, g_1, g_2, tol_1, tol_2) (e_1, e_2)
-    e_1 = e_2 = 3 # init high value of error
+    e1 = e2 = [3;3;3] # init high value of error
     θ = θinit 
     CoMactuel = CoM0
     #DEBUG
-    steps = 3
+    steps = 100
 
     # Init vectors of plot (trajectory_θ, trajectory_z, trajectory_CoM)
     trajectory_θ = Vector{Vector{Float64}}()
-    trajectory_z = Vector{Vector{Float64}}()
+    trajectory_z = Vector{Float64}()
     trajectory_CoM = Vector{Vector{Float64}}()
 
     # Calculate My current theta********
 
-    pact = MGD(θinit, rob)[1:3, 4]
+    current_p = MGD(θinit, rob)[1:3, 4]
 
-    # Calculte e_1 et e_2, update les jacobienes et les crop,  check convergence
+    # Caclulate e_1 et e_2, update les jacobienes et les crop
         for i = 1:steps
             println("step:",i)
-
-            J1 = Jacobian(θ,rob,pact)
-            # show(stdout,"text/plain", J1); print("\n")
+        
+            J1 = Jacobian(θ,rob,current_p)
             J1_crop = J1[3:3, :]
-            # println("J1_crop size = ", size(J1_crop))
-            # show(stdout,"text/plain", J1_crop); print("\n")
             J2 = JacobianCoM(θ,rob,CoM0)
-            # println("J2 = ", size(J2))
             J2_crop = J2[1:2,:]
-            # println("J2_crop = ", size(J2_crop))
 
-
-            e1 = g1 - pact
+            e1 = g1 - current_p
             e2 = g2 - CoMactuel
-            # show(stdout,"text/plain", e1)
-            println(".")
 
             # Calculer J1 et son action u1 = j_1+ e_1
             u1 = pinv(J1_crop)*e1[3]
-            # println("ut1",u1)
-            # Calcular sa projection P1 = I - J_1+J_1 (combien reste)
+
+            # Calculate its projection P1 = I - J_1+J_1
+
             P1 = Matrix{Float64}(I, 7, 7) - pinv(J1_crop)*J1_crop #*** why is it 1x1
-            # println("P1: ")
-            # show(stdout,"text/plain", P1); 
+    
             # Calculater u2 = (J2Pi)+*(e2-J1u1) # since I cropt the jacobian I have to crop and isolate the error on the same axis
             u2 = pinv(J2_crop*P1)*(e2[1:2,:]-J2_crop*u1)
-            # println("ut2",u2)
+
             # Calculate u_f = u1 + u2
 
             uf = u1 + u2
-            # println("sieze ut",size(ut))
-            # update θ = θ +  u_f*dt
-            θ = θ + uf
-            pact = MGD(θinit, rob)[1:3, 4]
-            # return trajectories, success
 
+            # update θ = θ +  u_f*dt 
+            θ = vec(θ + uf)
+            # print("θ size",size(θ))
+            # setjointposition(clientID,θ,7,0,objectname_kuka)
+            sleep(0.05)
+
+            # update CoM and current position
+            current_p = MGD(θ, rob)[1:3, 4]
+            CoMactuel = vec(CoM(θ,rob)[1:3,:])
+            push!(trajectory_θ,θ)
+            push!(trajectory_z,current_p[3])
+            push!(trajectory_CoM, CoMactuel)
+
+            #check convergence
+            if ((abs(e1[3]) < tol_1 )&& (norm(e2[1:2]) < tol_2))
+
+                break
+            end
+            println("e2 =", norm(e2[1:2]))
         end
         
+    if do_plot == 1
+        # Extract x, y, z components of CoM for plotting
+        CoM_value_x = [element[1] for element in trajectory_CoM]
+        CoM_value_y = [element[2] for element in trajectory_CoM]
+        CoM_value_z = [element[3] for element in trajectory_CoM]
 
-    # plot graph
+        # Plot CoM values for x, y, and z
+        pCoM_xy = plot(CoM_value_x, label="CoMₓ", xlabel="Iteration", ylabel="Position", title="CoM Components (X & Y)")
+        plot!(pCoM_xy, CoM_value_y, label="CoMᵧ")
+        # plot!(pCoM_xy, CoM_value_z, label="CoM𝓏", linestyle=:dash)
 
+        # Plot joint angles θ
+        pθ = hcat(trajectory_θ...)  # Convert trajectory_θ to a matrix
+        pθ_plot = plot(pθ', label=["θ₁" "θ₂" "θ₃" "θ₄" "θ₅" "θ₆" "θ₇"], xlabel="Iteration", ylabel="Joint Angles", title="Joint Angles over Iterations")
 
+        # Plot Z component (robot height)
+        pz = plot(trajectory_z, label="z", xlabel="Iteration", ylabel="Height (z)", title="Z Component of CoM")
 
+        # Arrange subplots for CoM, Z, and θ
+        p = plot(pCoM_xy, pz, pθ_plot, layout=(3, 1),
+                titlefontsize=4,
+                guidefontsize=4,
+                tickfontsize=4,
+                legendfontsize=4,)
+        display(p)
 
+        # display(pθ_plot)
+        # display(pCoM_xy)
+        # display(pz)
+    end
    println("end of function")
+   return θ
 end
 
 # Start of the simulation
-global clientID=startsimulation(simx_opmode_oneshot) # On lance une instance de connexion avec VREP
-if clientID==0 println("Connected")
-    else println("Connection error")
-end
+# global clientID=startsimulation(simx_opmode_oneshot) # On lance une instance de connexion avec VREP
+# if clientID==0 println("Connected")
+    # init_pos()
+#     else println("Connection error")
+# end
 
 # Main logic
-init_pos()
+
 sleep(2)
 
 global rob=CreateRobotKukaLwr();
@@ -98,7 +130,12 @@ global pinit = pinit[1:3,4]
 println("pinit:",pinit)
 
 # Task hirearchy
-
 Z_target=[pinit[1], pinit[2], 0.5];
 println("Z_target:", Z_target)
-multi_task(θinit,Z_target,CoM_target,1e-3,1e-3)
+
+θ = multi_task(θinit,Z_target,CoM_target,1e-2,1e-2,1)
+
+# DEBUG
+println("CoM_target:", CoM_target)
+CoM_atual = CoM(θ,rob)
+println("CoM_atual:", CoM_atual)

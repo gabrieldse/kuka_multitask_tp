@@ -1,15 +1,9 @@
-
-
 # Path to resources
 PATHCSIM="/home/gabriel/Polytech/S9/kuka_multitache/";
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-robotique.jl"); 
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
 
 using Plots
-
-# Optimize debugger performance by treating Base as compiled
-using JuliaInterpreter
-push!(JuliaInterpreter.compiled_modules, Base)
 
 function cininCoM(θinit,rob,CoMtarget,step,do_plot=1,max_iterations=200,tol=1e-3,dt=0.05)
     """
