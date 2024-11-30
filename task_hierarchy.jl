@@ -4,8 +4,14 @@ include("/home/gabriel/Polytech/S9/kuka_multitache/lib-robotique.jl");
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
 
 using Plots
+using Printf
 
 function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
+    println("[Task Hier.] Starting task hierarchy...")
+    formatted_g1 = join([@sprintf("%.2f", x) for x in g1], ", ")
+    println("[Task Hier.] Goal position end effector = ", formatted_g1 )
+    formatted_g2 = join([@sprintf("%.2f", x) for x in g2], ", ")
+    println("[Task Hier.] Goal CoM's position = ", formatted_g2)
     
     """
 
@@ -28,9 +34,8 @@ function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
     current_p = MGD(θinit, rob)[1:3, 4]
 
     # Caclulate e_1 et e_2, update les jacobienes et les crop
-        for i = 1:steps
-            println("step:",i)
-        
+    println("[Task Hier.] Iterating...")
+        for i = 1:steps       
             J1 = Jacobian(θ,rob,current_p)
             J1_crop = J1[3:3, :]
             J2 = JacobianCoM(θ,rob,CoM0)
@@ -56,7 +61,7 @@ function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
             # update θ = θ +  u_f*dt 
             θ = vec(θ + uf)
             # print("θ size",size(θ))
-            # setjointposition(clientID,θ,7,0,objectname_kuka)
+            setjointposition(clientID,θ,7,0,objectname_kuka)
             sleep(0.05)
 
             # update CoM and current position
@@ -68,12 +73,19 @@ function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
 
             #check convergence
             if ((abs(e1[3]) < tol_1 )&& (norm(e2[1:2]) < tol_2))
-
+                println("[Task Hier.] Done in ",i," steps. Error 1 = ",@sprintf("%.3f",abs(e1[3]))," error 2 = ",@sprintf("%.3f",norm(e2[1:2])) )
                 break
             end
-            println("e2 =", norm(e2[1:2]))
+
+            if (i == 100)
+                println("[Task Hier.] Done in ",steps," steps. Error 1 = ",@sprintf("%.3f",abs(e1[3]))," error 2 = ",@sprintf("%.3f",norm(e2[1:2])) )
+            end
         end
+
         
+        
+    
+    
     if do_plot == 1
         # Extract x, y, z components of CoM for plotting
         CoM_value_x = [element[1] for element in trajectory_CoM]
@@ -86,8 +98,12 @@ function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
         # plot!(pCoM_xy, CoM_value_z, label="CoM𝓏", linestyle=:dash)
 
         # Plot joint angles θ
-        pθ = hcat(trajectory_θ...)  # Convert trajectory_θ to a matrix
+        pθ = hcat(trajectory_θ...).* 180 / pi  # Convert trajectory_θ to a matrix
         pθ_plot = plot(pθ', label=["θ₁" "θ₂" "θ₃" "θ₄" "θ₅" "θ₆" "θ₇"], xlabel="Iteration", ylabel="Joint Angles", title="Joint Angles over Iterations")
+
+        # θ1_values = [trajectory_θ[i][1] for i in 1:length(trajectory_θ)] .* 180 / pi
+        # pθ_plot = plot(θ1_values, label="θ₁", xlabel="Iteration", ylabel="Joint Angle (degrees)", title="Joint Angle θ₁ over Iterations")
+        # println("")
 
         # Plot Z component (robot height)
         pz = plot(trajectory_z, label="z", xlabel="Iteration", ylabel="Height (z)", title="Z Component of CoM")
@@ -104,16 +120,18 @@ function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
         # display(pCoM_xy)
         # display(pz)
     end
-   println("end of function")
-   return θ
+
+    formatted_trajector_θ = join([@sprintf("%.2f", x) for x in trajectory_θ[end].* 180/pi], ", ")
+    println("[Task Hier.] Final θ angles = ", formatted_trajector_θ)
+    return θ
 end
 
 # Start of the simulation
-# global clientID=startsimulation(simx_opmode_oneshot) # On lance une instance de connexion avec VREP
-# if clientID==0 println("Connected")
-    # init_pos()
-#     else println("Connection error")
-# end
+global clientID=startsimulation(simx_opmode_oneshot) # On lance une instance de connexion avec VREP
+if clientID==0 println("Connected")
+    init_pos()
+    else println("Connection error")
+end
 
 # Main logic
 
@@ -127,15 +145,7 @@ CoM_target = [0, 0.1 , CoM0[3]]
 pinit = MGD(θinit,rob)
 global pinit = pinit[1:3,4]
 
-println("pinit:",pinit)
-
 # Task hirearchy
 Z_target=[pinit[1], pinit[2], 0.5];
-println("Z_target:", Z_target)
 
 θ = multi_task(θinit,Z_target,CoM_target,1e-2,1e-2,1)
-
-# DEBUG
-println("CoM_target:", CoM_target)
-CoM_atual = CoM(θ,rob)
-println("CoM_atual:", CoM_atual)
