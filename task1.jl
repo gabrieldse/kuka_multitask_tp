@@ -1,4 +1,5 @@
 using Plots
+using Printf
 
 # Path to resources
 PATHCSIM="/home/gabriel/Polytech/S9/kuka_multitache/";
@@ -6,6 +7,11 @@ include("/home/gabriel/Polytech/S9/kuka_multitache/lib-robotique.jl");
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
 
 function cininv(θinit,rob,x_target,step,do_plot=1,max_iterations=200,tol=1e-3,dt=0.05)
+    println("[Task End Effector along Z] Starting task hierarchy...")
+    formatted_x_target = join([@sprintf("%.2f", x) for x in x_target], ", ")
+    println("[Task End Effector along Z] Goal position end effector = ", formatted_x_target )
+
+
     """
     Perform inverse kinematics to move the robot's end-effector to `x_target`.
 
@@ -17,29 +23,27 @@ function cininv(θinit,rob,x_target,step,do_plot=1,max_iterations=200,tol=1e-3,d
         [e_x;zeros(3)] = change in position and orientation
     """
 
-    # Init values
+    # Init variables
     trajectory_xyz = Vector{Vector{Float64}}()
     trajectory_θ = Vector{Vector{Float64}}()
     θcurrent = θinit
     e_x = [sum(rob.r);sum(rob.r);sum(rob.r)]
-    println(e_x)
     i = 1
-
+    println("[Task End Effector along Z] Iterating...")
     while (norm(e_x) > tol)
+        
         # 1 - Get current position via MGD
         Tcurrent = MGD(θcurrent,rob)
         x_current = Tcurrent[1:3,4]
         push!(trajectory_θ,θcurrent)
 
-        # 2 - Caclulate error (Δx = velocity)
+        # 2 - Calculate error (Δx = velocity)
         e_x = x_target - x_current
-        println("Iteration $i. Error: ", e_x./100,"%")
         J = Jacobian(θinit,rob,x_current)
         J_trans = J[1:3, :]
 
         # 3 - Compute Δθ to correct error
-        θd = pinv(J_trans) * e_x./step #x_current[3] -
-        # println("Mudanca de angul:",θd)
+        θd = pinv(J_trans) * e_x./step
 
         # 4 - Update current angle
         θcurrent += θd
@@ -49,12 +53,12 @@ function cininv(θinit,rob,x_target,step,do_plot=1,max_iterations=200,tol=1e-3,d
 
         i = i + 1
         if (i == max_iterations)
-            println("Too many cycles")
+            println("[Task End Effector along Z] Done in ",i," steps. Error norm = ",@sprintf("%.3f",norm(e_x))," [m]")
 
             if (do_plot==1)
                 # Plot values
                 z_values = [element[3] for element in trajectory_xyz]
-                pθ = hcat(trajectory_θ...)
+                pθ = hcat(trajectory_θ...).* 180 / pi
                 pz = plot(z_values, label="z", xlabel="Iteration", ylabel="Position", title="Z Component")
                 pθ2 =  plot(pθ', label=["θ₁" "θ₂" "θ₃" "θ₄" "θ₅" "θ₆" "θ₇"], xlabel="Iteration", ylabel="Motors angles", title="Motors angles")
                 p = plot(pz, pθ2, layout=(2, 1))
@@ -64,6 +68,7 @@ function cininv(θinit,rob,x_target,step,do_plot=1,max_iterations=200,tol=1e-3,d
             return trajectory_xyz, trajectory_θ
             break
         end
+
     end
 
     if (do_plot==1)
@@ -75,6 +80,12 @@ function cininv(θinit,rob,x_target,step,do_plot=1,max_iterations=200,tol=1e-3,d
         p = plot(pz, pθ2, layout=(2, 1))
         display(p)
     end
+
+    formated_z_values = join([@sprintf("%.2f", z) for z in z_values[end]], ", ")
+    println("[Task End Effector along Z] Final end effector position  = ", formated_z_values)
+    
+    formatted_trajector_θ = join([@sprintf("%.2f", x) for x in trajectory_θ[end].* 180/pi], ", ")
+    println("[Task End Effector along Z] Final θ angles = ", formatted_trajector_θ)
 
     return trajectory_xyz, trajectory_θ
 end

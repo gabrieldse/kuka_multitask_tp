@@ -1,10 +1,10 @@
+using Plots
+using Printf
+
 # Path to resources
 PATHCSIM="/home/gabriel/Polytech/S9/kuka_multitache/";
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-robotique.jl"); 
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
-
-using Plots
-using Printf
 
 function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
     println("[Task Hier.] Starting task hierarchy...")
@@ -13,10 +13,6 @@ function multi_task(θinit,g1,g2,tol_1=1e-3,tol_2=1e-3,do_plot=0)
     formatted_g2 = join([@sprintf("%.2f", x) for x in g2], ", ")
     println("[Task Hier.] Goal CoM's position = ", formatted_g2)
     
-    """
-
-    """
-
     # Init variables (J1, J2, g_1, g_2, tol_1, tol_2) (e_1, e_2)
     e1 = e2 = [3;3;3] # init high value of error
     θ = θinit 

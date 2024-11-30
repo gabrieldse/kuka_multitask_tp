@@ -1,11 +1,10 @@
+using Plots
+using Printf
 
 # Path to resources
 PATHCSIM="/home/gabriel/Polytech/S9/kuka_multitache/";
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-robotique.jl"); 
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
-
-using Plots
-using Printf
 
 function cost_function_gradient(θ, θ_min, θ_max)
     θ_moy = (θ_max .+ θ_min) ./ 2  

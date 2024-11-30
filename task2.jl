@@ -1,11 +1,17 @@
+using Plots
+using Printf
+
 # Path to resources
 PATHCSIM="/home/gabriel/Polytech/S9/kuka_multitache/";
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-robotique.jl"); 
 include("/home/gabriel/Polytech/S9/kuka_multitache/lib-CSim.jl");
 
-using Plots
-
 function cininCoM(θinit,rob,CoMtarget,step,do_plot=1,max_iterations=200,tol=1e-3,dt=0.05)
+    println("[Task CoM movement along X & Y] Starting Task CoM along X & Y  ...")
+    formatted_CoMtarget = join([@sprintf("%.2f", x) for x in CoMtarget], ", ")
+    println("[Task CoM movement along X & Y] Goal CoM's position = ", formatted_CoMtarget )
+
+
     """
     Perform inverse kinematics to move the robot's center of mass to the `CoMtarget`.
 
@@ -21,31 +27,24 @@ function cininCoM(θinit,rob,CoMtarget,step,do_plot=1,max_iterations=200,tol=1e-
     trajectory_θ = Vector{Vector{Float64}}()
     θcurrent = θinit
     e_CoM = [sum(rob.r);sum(rob.r);sum(rob.r)]
-    println(e_CoM)
     i = 1
 
-    println("Initial CoM = ", CoM(θcurrent,rob))
-
+    println("[Task CoM movement along X & Y] Iterating...")
     while (norm(e_CoM) > tol)
         # 1 - Get current position via MGD
         CoMcurrent = CoM(θcurrent,rob)
         CoMcurrent = CoMcurrent[1:3]
-        println("CoMcurrent:",CoMcurrent)
-        println("CoMtarget:",CoMtarget)
-        println("e_CoM:",e_CoM)
         
         # CoMcurrent = CoMcurrent[1:3,4]
         push!(trajectory_θ,θcurrent)
 
         # 2 - Caclulate error (Δx = velocity)
         e_CoM = CoMtarget - CoMcurrent
-        println("Iteration $i. Error: ", e_CoM./100,"%")
         J = JacobianCoM(θinit,rob,CoMcurrent)
         J_trans = J[1:3, :]
 
         # 3 - Compute Δθ to correct error
         θd = pinv(J_trans) * e_CoM./step #CoMcurrent[3] -
-        # println("Mudanca de angul:",θd)
 
         # 4 - Update current angle
         θcurrent += θd
@@ -55,46 +54,31 @@ function cininCoM(θinit,rob,CoMtarget,step,do_plot=1,max_iterations=200,tol=1e-
 
         i = i + 1
         if (i == max_iterations)
-            println("Too many cycles")
-
-            if (do_plot == 1)
-                CoM_value_x = [element[1] for element in trajectory_CoM]
-                CoM_value_y = [element[2] for element in trajectory_CoM]
-                CoM_value_z = [element[3] for element in trajectory_CoM]
-            
-                # Plot CoM values for x and y together
-                pCoM_xy = plot(CoM_value_x, label="CoMₓ", xlabel="Iteration", ylabel="Position", title="CoM Components (X & Y)")
-                plot!(pCoM_xy, CoM_value_y, label="CoMᵧ")
-            
-                # Plot motor θ values values 
-                pθ = hcat(trajectory_θ...)
-                pθ2 =  plot(pθ', label=["θ₁" "θ₂" "θ₃" "θ₄" "θ₅" "θ₆" "θ₇"], xlabel="Iteration", ylabel="Motors angles", title="Motors angles")
-            
-                # Arrange subplots
-                p = plot(pCoM_xy, pθ2, layout=(2, 1))
-                display(p)
-            end
-            
-            return trajectory_CoM, trajectory_θ
+            println("[Task CoM movement along X & Y] Done in ",i," steps. Error norm = ",@sprintf("%.3f",norm(e_CoM))," [m]")
             break
         end
     end
 
-    if (do_plot==1)
-        # Plot values
-        z_values = [element[3] for element in trajectory_CoM]
-        pθ = hcat(trajectory_θ...)
-        pz = plot(z_values, label="z", xlabel="Iteration", ylabel="Position", title="Z Component")
+    if (do_plot == 1)
+        CoM_value_x = [element[1] for element in trajectory_CoM]
+        CoM_value_y = [element[2] for element in trajectory_CoM]
+        pCoM_xy = plot(CoM_value_x, label="CoMₓ", xlabel="Iteration", ylabel="Position", title="CoM Components (X & Y)")
+        plot!(pCoM_xy, CoM_value_y, label="CoMᵧ")
+    
+        pθ = hcat(trajectory_θ...).*180/pi
         pθ2 =  plot(pθ', label=["θ₁" "θ₂" "θ₃" "θ₄" "θ₅" "θ₆" "θ₇"], xlabel="Iteration", ylabel="Motors angles", title="Motors angles")
-        p = plot(pz, pθ2, layout=(2, 1))
+
+        p = plot(pCoM_xy, pθ2, layout=(2, 1))
         display(p)
     end
+    
 
+    formatted_trajector_θ = join([@sprintf("%.2f", x) for x in trajectory_θ[end].* 180/pi], ", ")
+    println("[Task Hier.] Final θ angles = ", formatted_trajector_θ)
     return trajectory_CoM, trajectory_θ
 end
 
-# Start of the simulation
-global clientID=startsimulation(simx_opmode_oneshot) # On lance une instance de connexion avec VREP
+global clientID=startsimulation(simx_opmode_oneshot)
 if clientID==0 println("Connected")
     else println("Connection error")
 end
